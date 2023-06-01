@@ -17,6 +17,7 @@
 package com.google.accompanist.sample.navigation.material
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Column
@@ -25,8 +26,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.Button
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
+import androidx.navigation.NavDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -35,7 +43,26 @@ import com.google.accompanist.navigation.material.ModalBottomSheetLayout
 import com.google.accompanist.navigation.material.bottomSheet
 import com.google.accompanist.navigation.material.rememberBottomSheetNavigator
 import com.google.accompanist.sample.AccompanistSampleTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import java.util.UUID
+
+class BottomSheetViewModel : ViewModel() {
+    private val _isLoading = MutableStateFlow<Boolean?>(null)
+
+    val isLoading: StateFlow<Boolean?>
+        get() = _isLoading.asStateFlow()
+
+    fun load() {
+        viewModelScope.launch {
+            delay(300)
+            _isLoading.emit(false)
+        }
+    }
+}
 
 class BottomSheetNavSample : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,6 +87,9 @@ private object Destinations {
 fun BottomSheetNavDemo() {
     val bottomSheetNavigator = rememberBottomSheetNavigator()
     val navController = rememberNavController(bottomSheetNavigator)
+    navController.addOnDestinationChangedListener { _: NavController, destination: NavDestination, _: Bundle? ->
+        Log.i("Debug", "navigation destination changed $destination")
+    }
 
     ModalBottomSheetLayout(bottomSheetNavigator) {
         NavHost(navController, Destinations.Home) {
@@ -101,13 +131,19 @@ private fun HomeScreen(showSheet: () -> Unit, showFeed: () -> Unit) {
 
 @Composable
 private fun BottomSheet(showFeed: () -> Unit, showAnotherSheet: () -> Unit, arg: String) {
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("Sheet with arg: $arg")
-        Button(onClick = showFeed) {
-            Text("Click me to navigate!")
-        }
-        Button(onClick = showAnotherSheet) {
-            Text("Click me to show another sheet!")
+    val viewModel: BottomSheetViewModel = viewModel()
+    val isLoading by viewModel.isLoading.collectAsState()
+    viewModel.load()
+
+    isLoading?.let {
+        Column(Modifier.fillMaxWidth()) {
+            Text("Sheet with arg: $arg")
+            Button(onClick = showFeed) {
+                Text("Click me to navigate!")
+            }
+            Button(onClick = showAnotherSheet) {
+                Text("Click me to show another sheet!")
+            }
         }
     }
 }
